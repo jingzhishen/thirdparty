@@ -1,0 +1,366 @@
+#!/bin/sh
+
+#CROSS_COMPILE=csky-linux-
+CROSS_COMPILE=
+#ARCH=csky
+ARCH=x86
+
+CC=$CROSS_COMPILE\gcc
+
+#echo "cc:"$CC
+TARGET_DIR=$(cd `dirname $0`; pwd)/output
+#echo "target dir:"$TARGET_DIR
+build_openssl() {
+    cd openssl-1.0.1e
+    ./Configure --prefix=/opt/goxceed/$ARCH-linux no-shared os/compiler:${CROSS_COMPILE}gcc
+    make install
+    cd -
+}
+
+build_directfb() {
+    cd DirectFB-1.6.3
+    ./configure --host=$ARCH-linux --prefix=/home/gx/nfs/lib/directfb \
+        --sysconfdir=/etc \
+        --enable-static \
+        --enable-debug-support=no \
+        --enable-text=no \
+        --enable-debug=no \
+        --enable-trace=no \
+        --disable-x11 \
+        --disable-pvr2d \
+        --disable-imlib2 \
+        --disable-imlib2 \
+        --disable-vnc \
+        --disable-video4linux \
+        --disable-fbdev \
+        --enable-gxsystem \
+        --without-tools \
+        --with-gfxdrivers=gxga --with-inputdrivers=linuxinput \
+        LIBS="-lrt -ldl -lm -lstdc++ -lz" \
+        LDFLAGS=-L/opt/goxceed/$ARCH-linux/lib/ \
+        CFLAGS="-I/opt/goxceed/$ARCH-linux/include -mhard-float" \
+        FREETYPE_CFLAGS=-I/opt/goxceed/$ARCH-linux/include/ \
+        FREETYPE_LIBS=/opt/goxceed/$ARCH-linux/lib/libfreetype.a
+    make install
+    cd -
+}
+
+build_ffmpeg() {
+    cd ffmpeg
+    ./configure \
+        --prefix=/opt/goxceed/$ARCH-linux \
+        --cc=csky-linux-gcc        \
+        --enable-cross-compile     \
+        --host-os=linux            \
+        --target-os=linux          \
+        --arch=csky                \
+        --cpu=csky                 \
+        --extra-cflags="-Wa,-mno-jsri2bsr" \
+        --extra-ldflags="--static" \
+        --disable-stripping        \
+        --enable-small             \
+        --disable-doc              \
+        --disable-avdevice         \
+        --disable-swresample       \
+        --disable-swscale          \
+        --disable-postproc         \
+        --disable-avfilter         \
+        --disable-dct              \
+        --disable-dwt              \
+        --disable-error-resilience \
+        --disable-lsp              \
+        --disable-lzo              \
+        --disable-mdct             \
+        --disable-rdft             \
+        --disable-fft              \
+                                   \
+        --disable-encoders         \
+        --disable-hwaccels         \
+        --disable-muxers           \
+        --disable-bsfs             \
+        --disable-devices          \
+        --disable-decoders         \
+        --disable-filters          \
+        --disable-demuxers         \
+        --disable-protocols        \
+        --disable-parsers          \
+        --enable-demuxer="aac,ac3,eac3,ape,flac,flv,avi,avs,dts,h26*,m4v,mp3,mpeg*,ogg,pcm*,rm,matroska,wav,mov,rtsp,rtp,jacosub,sami,srt,subrip,subviewer*,text" \
+        --enable-protocol="cache,file,http*,*rtmp,rtp,srtp"
+        #--enable-parser="aac*,ac3,flac,h26*,mpeg*,vorbis"
+
+    make install
+    cd -
+}
+
+build_uclibc_plus() {
+    cd uClibc++-0.2.4
+    cp uClibc++-0.2.4.config .config
+    make CROSS=$ARCH-linux install
+    cd -
+}
+
+build_wpa_supplicant() {
+    cd wpa_supplicant-2.0/wpa_supplicant
+    LDFLAGS="-L/opt/goxceed/$ARCH-linux/lib --static" \
+        CFLAGS=-I/opt/goxceed/$ARCH-linux/include \
+        BINDIR=/opt/goxceed/$ARCH-linux/bin CC=csky-linux-gcc make install
+
+    cd -
+}
+
+build_compat_wireless() {
+    cd compat-wireless-2012-02-06
+    "./scripts/driver-select" rt2x00
+
+    make KLIB=/opt/goxceed/kernel-$ARCH \
+         KLIB_BUILD=/opt/goxceed/kernel-$ARCH \
+         ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE || exit 1
+
+    find -name "*80211.ko" \
+             -or -name "comp*.ko" \
+             -or -name "rt2x*.ko" \
+             -or -name "rfkill_backport.ko" \
+             -or -name "rt2800*.ko" | \
+             xargs -i cp {} $TARGET_DIR/lib/modules/2.6.27.55/
+
+    find  -name *.ko | xargs csky-linux-strip -g -X --strip-unneeded
+
+    cd -
+}
+
+build_libnl() {
+    cd libnl-3.2.21
+    LIBS="-lpthread -ldl" ./configure --host=csky-linux --prefix=/opt/goxceed/csky-linux/ --disable-shared
+    make install || exit 1
+
+    cd -
+}
+
+build_libpcre() {
+    cd pcre-8.21
+    LIBS="-lpthread -ldl" ./configure --host=csky-linux -build=i386 --prefix=/opt/goxceed/csky-linux/ --disable-shared
+    make install || exit 1
+
+    cd -
+}
+
+build_curl() {
+    cd curl-7.22.0
+    CFLAGS='-m64' CPPFLAGS='-m64'  ./configure CC=$CC  --build=i686-linux --prefix=$TARGET_DIR/curl/ \
+	    --with-zlib \
+        --without-libidn \
+        --without-librtmp \
+        --with-ssl=$TARGET_DIR/ \
+        --enable-static \
+	    --disable-ipv6 \
+	    #--disable-shared \
+	    --disable-rtsp \
+	    --disable-rtmp \
+	    --disable-ldap \
+	    --disable-ldaps \
+	    --disable-pop3 \
+	    --disable-imap \
+	    --disable-smtp \
+	    --disable-gopher \
+	    --disable-manual \
+	    --disable-tftp \
+	    --disable-dict \
+	    --disable-telnet \
+
+    make ; make install || exit 1
+
+    cd -
+}
+
+build_hostapd() {
+    cd hostapd-2.0/hostapd
+    CFLAGS=`pkg-config --cflags /opt/goxceed/csky-linux/lib/pkgconfig/libnl-3.0.pc`
+    LDFLAGS=`pkg-config --libs /opt/goxceed/csky-linux/lib/pkgconfig/libnl-3.0.pc`
+    CFLAGS=-I/opt/goxceed/csky-linux/include \
+        LDFLAGS=-L/opt/goxceed/csky-linux/lib \
+        CC=csky-linux-gcc LIBS="-pthread -ldl -lm" make
+
+    cd -
+}
+build_js185() {
+    cd js-1.8.5/js/src
+    #./configure CC=$CC   --prefix=$TARGET_DIR/js185/ \
+    #./configure CXX=$CC target=csky --prefix=$TARGET_DIR/js185/ \
+    ./configure   --prefix=$TARGET_DIR/js185/ \
+        --enable-static \
+
+    make ; make install || exit 1
+
+    cd -
+}
+build_yasm() {
+    cd ffmpeg/yasm-1.2.0
+    ./configure   --prefix=$TARGET_DIR/ffmpeg/ffmpeg_build/ --bindir=$TARGET_DIR/ffmpeg/bin ;\
+    make ; make install || exit 1
+	make distclean 
+    export "PATH=$PATH:$TARGET_DIR/ffmpeg/bin"
+	cd -
+}
+build_x264() {
+    cd ffmpeg/x264-snapshot*
+    ./configure   --prefix=$TARGET_DIR/ffmpeg/ffmpeg_build/ --bindir=$TARGET_DIR/ffmpeg/bin \
+        --enable-static ;\
+    make ; make install || exit 1
+	make distclean 
+    cd -
+}
+build_fdkaac() {
+    cd ffmpeg/mstorsjo-fdk-aac*
+	autoreconf -fiv
+    ./configure   --prefix=$TARGET_DIR/ffmpeg/ffmpeg_build/ --bindir=$TARGET_DIR/ffmpeg/bin \
+        --disable-shared ; \
+    make ; make install || exit 1
+	make distclean 
+    cd -
+}
+build_lame() {
+    cd ffmpeg/lame-3.99.5
+    ./configure   --prefix=$TARGET_DIR/ffmpeg/ffmpeg_build/ --bindir=$TARGET_DIR/ffmpeg/bin \
+        --enable-nasm \
+        --disable-shared ;\
+    make ; make install || exit 1
+	make distclean 
+    cd -
+}
+build_opus() {
+    cd ffmpeg/opus-1.1
+    ./configure  --prefix=$TARGET_DIR/ffmpeg/ffmpeg_build/ --bindir=$TARGET_DIR/ffmpeg/bin \
+        --disable-shared ;\
+    make ; make install || exit 1
+	make distclean 
+    cd -
+}
+build_vpx() {
+    cd ffmpeg/libvpx-v1.3.0
+    ./configure  --prefix=$TARGET_DIR/ffmpeg/ffmpeg_build/  \
+        --disable-examples ;\
+    make ; make install || exit 1
+	make clean 
+    cd -
+}
+
+build_ffmpeg() {
+    #cd ffmpeg/FFmpeg-master
+    cd ffmpeg/ffmpeg-2.2.4
+	PKG_CONFIG_PATH="$TARGET_DIR/ffmpeg/ffmpeg_build/lib/pkgconfig"
+	export PKG_CONFIG_PATH
+    export "PATH=$PATH:$TARGET_DIR/ffmpeg/bin"
+	#make clean 
+    ./configure  --prefix=$TARGET_DIR/ffmpeg/ffmpeg_build/ --bindir=$TARGET_DIR/ffmpeg/bin \
+        --extra-cflags=" -I$TARGET_DIR/ffmpeg/ffmpeg_build/include" \
+		--extra-ldflags="-L$TARGET_DIR/ffmpeg/ffmpeg_build/lib" --extra-libs="-ldl" \
+		--enable-gpl \
+		--enable-libass --enable-libfdk-aac --enable-libfreetype --enable-libmp3lame --enable-libopus \
+		--enable-libtheora --enable-libvorbis --enable-libvpx --enable-libx264 --enable-nonfree --enable-x11grab \
+		--disable-stripping \
+		--enable-extra-warnings \
+		--disable-optimizations \
+		--enable-openssl  \
+		--enable-static \
+		--enable-debug=3 ;\
+    #make ; make install || exit 1
+	#make clean 
+	#make distclean 
+	make
+    cd -
+}
+#disabled-optimization
+#-fomit-frame-pointer
+    #./configure  --prefix=$TARGET_DIR/mplayer/  \
+	#	--enable-static \
+	#	--enable-debug=3 ;\
+#./configure --prefix=/usr/local/mplayer/ --enable-gui --enable-freetype --codecsdir=/usr/lib/codecs/ --win32codecsdir=/usr/lib/wincodecs/ --language=zh_CN       --disable-ivtv
+build_mplayer1() {
+#	perl -pi -e 's|-O2|-O0|g' `find ./ -type f`
+    cd MPlayer-1.1.1
+	make clean 
+    export "PATH=$PATH:$TARGET_DIR/ffmpeg/bin"
+	./configure  --prefix=$TARGET_DIR/mplayer/ --disable-gui --language=zh_CN  --disable-ivtv   --enable-debug=3
+	#perl -pi -e 's|-O2|-O0  -fno-pic -fomit-frame-pointer|g' `find ./ -type f`
+	#perl -pi -e 's|-fomit-frame-pointer| |g' `find ./ -type f`
+	#perl -pi -e 's|-O2|-O0 -fno-omit-frame-pointer|g' `find ./ -type f`
+	perl -pi -e 's|-O0|-O2|g' `find ./ -type f`
+	#export CFLAGS=-fomit-frame-pointer
+    make ; make install || exit 1
+	#make clean 
+    cd -
+}
+build_mplayer() {
+    #cd mplayer/MPlayer-1.0rc4
+    cd mplayer/mplayer/trunk
+    export "PATH=$PATH:$TARGET_DIR/ffmpeg/bin"
+	make clean 
+	./configure  --prefix=$TARGET_DIR/mplayer/ --disable-gui --language=zh_CN  --disable-ivtv   --enable-debug=3
+	#perl -pi -e 's|-O0|-O2|g' `find ./ -type f`
+    #make ; make install || exit 1
+    make  || exit 1
+	#make clean 
+    cd -
+}
+
+
+
+build_gstreamer() {
+    cd gstreamer-1.3.1
+    ./configure  --prefix=$TARGET_DIR/gstreamer/  ; \
+    #make ; make install || exit 1
+	#make clean 
+    cd -
+}
+
+build_vlc() {
+	PKG_CONFIG_PATH="$TARGET_DIR/ffmpeg/ffmpeg_build/lib/pkgconfig"
+	PKG_CONFIG="$TARGET_DIR/ffmpeg/ffmpeg_build/lib/pkgconfig/"
+	PKG_CONFIG_LIBDIR="$TARGET_DIR/ffmpeg/ffmpeg_build/lib"
+	export PKG_CONFIG_PATH
+    cd vlc/vlc-2.1.4
+    #cd vlc/vlc-2.0.8
+		#--disable-lua  \
+		#--enable-static \
+	./configure --prefix=$TARGET_DIR/vlc/vlc_build/ --bindir=$TARGET_DIR/vlc/bin \
+		--enable-dvbpsi \
+		--enable-debug  ;\
+	perl -pi -e 's|O2|O0 -fomit-frame-pointer|g' `find ./ -name Makefile`
+	#perl -pi -e 's|O2|O0  -fno-pic -fomit-frame-pointer|g' `find ./ -name Makefile`
+    #make ; make install || exit 1
+    make || exit 1
+    cd -
+}
+build_insight() {
+    cd insight/insight-6.8-1
+	#./configure --prefix=$TARGET_DIR/insight/insight_build/ --bindir=$TARGET_DIR/insight/bin --disable-werror ; 
+	./configure  --disable-werror ; 
+    #make ; make install || exit 1
+    #make || exit 1
+    cd -
+}
+
+
+#build_openssl
+#build_curl
+#build_js185
+#build_compat_wireless
+#build_libpcre
+#build_hostapd
+#build_wpa_supplicant
+
+
+#####this is for ffmpeg compile bottom########
+
+#build_yasm
+#build_x264 ###  x264 need yasm  ###
+#build_fdkaac
+#build_lame
+#build_opus
+#build_vpx ###  vpx need yasm  ###
+#build_ffmpeg
+build_mplayer
+#build_gstreamer
+
+#build_vlc
+#build_insight

@@ -1,0 +1,98 @@
+#!/bin/sh
+
+#CROSS_COMPILE=csky-linux-
+CROSS_COMPILE=
+#ARCH=csky
+ARCH=x86
+
+CC=$CROSS_COMPILE\gcc
+
+TARGET_DIR=$(cd `dirname $0`; pwd)/output
+
+build_yasm() {
+    cd yasm-1.2.0
+    ./configure   --prefix=$TARGET_DIR/ffmpeg_build/ --bindir=$TARGET_DIR/bin ;\
+    make ; make install || exit 1
+	make distclean 
+	cd -
+}
+build_x264() {
+    export "PATH=$PATH:$TARGET_DIR/bin"
+    cd x264-snapshot*
+    ./configure   --prefix=$TARGET_DIR/ffmpeg_build/ --bindir=$TARGET_DIR/bin \
+        --enable-static ;\
+    make ; make install || exit 1
+	make distclean 
+    cd -
+}
+build_fdkaac() {
+    cd mstorsjo-fdk-aac*
+	autoreconf -fiv
+    ./configure   --prefix=$TARGET_DIR/ffmpeg_build/ --bindir=$TARGET_DIR/bin \
+        --disable-shared ; \
+    make ; make install || exit 1
+	make distclean 
+    cd -
+}
+build_lame() {
+    cd lame-3.99.5
+    ./configure   --prefix=$TARGET_DIR/ffmpeg_build/ --bindir=$TARGET_DIR/bin \
+        --enable-nasm \
+        --disable-shared ;\
+    make ; make install || exit 1
+	make distclean 
+    cd -
+}
+build_opus() {
+    cd opus-1.1
+    ./configure  --prefix=$TARGET_DIR/ffmpeg_build/ --bindir=$TARGET_DIR/bin \
+        --disable-shared ;\
+    make ; make install || exit 1
+	make distclean 
+    cd -
+}
+build_vpx() {
+    export "PATH=$PATH:$TARGET_DIR/bin"
+    cd libvpx-v1.3.0
+    ./configure  --prefix=$TARGET_DIR/ffmpeg_build/  \
+        --disable-examples ;\
+    make ; make install || exit 1
+	make clean 
+    cd -
+}
+
+build_ffmpeg() {
+    #cd ffmpeg/FFmpeg-master
+    cd ffmpeg-2.2.4
+	PKG_CONFIG_PATH="$TARGET_DIR/ffmpeg_build/lib/pkgconfig"
+	export PKG_CONFIG_PATH
+    export "PATH=$PATH:$TARGET_DIR/ffmpeg/bin"
+	#make clean 
+    ./configure  --prefix=$TARGET_DIR/ffmpeg_build/ --bindir=$TARGET_DIR/bin \
+        --extra-cflags=" -I$TARGET_DIR/ffmpeg_build/include" \
+		--extra-ldflags="-L$TARGET_DIR/ffmpeg_build/lib" --extra-libs="-ldl" \
+		--enable-gpl \
+		--enable-libass --enable-libfdk-aac --enable-libfreetype --enable-libmp3lame --enable-libopus \
+		--enable-libtheora --enable-libvorbis --enable-libvpx --enable-libx264 --enable-nonfree --enable-x11grab \
+		--disable-stripping \
+		--enable-extra-warnings \
+		--disable-optimizations \
+		--enable-openssl  \
+		--enable-static \
+		--enable-debug=3 ;\
+    #make ; make install || exit 1
+	#make clean 
+	#make distclean 
+	make
+    cd -
+}
+
+#####this is for ffmpeg compile bottom########
+
+#build_yasm
+#build_x264 ###  x264 need yasm  ###
+#build_fdkaac
+#build_lame
+#build_opus
+#build_vpx ###  vpx need yasm  ###
+build_ffmpeg
