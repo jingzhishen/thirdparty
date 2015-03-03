@@ -89,10 +89,10 @@ build_ffmpeg() {
 
 #####this is for ffmpeg compile bottom########
 
-#build_yasm
-#build_x264 ###  x264 need yasm  ###
-#build_fdkaac
-#build_lame
-#build_opus
-#build_vpx ###  vpx need yasm  ###
+build_yasm
+build_x264 ###  x264 need yasm  ###
+build_fdkaac
+build_lame
+build_opus
+build_vpx ###  vpx need yasm  ###
 build_ffmpeg
