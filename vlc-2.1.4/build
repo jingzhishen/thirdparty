@@ -1,0 +1,30 @@
+#!/bin/sh
+
+#CROSS_COMPILE=csky-linux-
+CROSS_COMPILE=
+#ARCH=csky
+ARCH=x86
+
+CC=$CROSS_COMPILE\gcc
+
+TARGET_DIR=$(cd `dirname $0`; pwd)/output
+
+build_vlc() {
+	#PKG_CONFIG_PATH="$TARGET_DIR/ffmpeg/ffmpeg_build/lib/pkgconfig"
+	#PKG_CONFIG="$TARGET_DIR/ffmpeg/ffmpeg_build/lib/pkgconfig/"
+	#PKG_CONFIG_LIBDIR="$TARGET_DIR/ffmpeg/ffmpeg_build/lib"
+	#export PKG_CONFIG_PATH
+    #cd vlc/vlc-2.0.8
+		#--disable-lua  \
+		#--enable-static \
+	./configure --prefix=$TARGET_DIR/vlc_build/ --bindir=$TARGET_DIR/bin \
+		--enable-dvbpsi \
+		--enable-debug  ;\
+	perl -pi -e 's|O2|O0 -fomit-frame-pointer|g' `find ./ -name Makefile`
+	#perl -pi -e 's|O2|O0  -fno-pic -fomit-frame-pointer|g' `find ./ -name Makefile`
+    #make ; make install || exit 1
+    make || exit 1
+    cd -
+}
+
+build_vlc
